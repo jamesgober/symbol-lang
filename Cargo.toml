@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "symbol-lang"
-version = "0.1.0"
+version = "1.0.0"
 
 # Minimum Supported Rust Version (MSRV)
 rust-version = "1.85"
@@ -19,10 +19,10 @@ readme = "README.md"
 description = "Symbol tables, scopes, and name binding/resolution."
 
 # Keywords (5 max)
-keywords = [compiler,language,symbols,scopes]
+keywords = ["compiler", "language", "symbols", "scopes"]
 
 # Categories
-categories = [development-tools,compilers]
+categories = ["development-tools", "compilers"]
 
 # Links
 homepage      = "https://github.com/jamesgober/symbol-lang"
@@ -45,15 +45,16 @@ path = "src/lib.rs"
 # #################################
 [features]
 default = ["std"]
-std = []
-# Serialization support.
-serde = ["dep:serde"]
+std = ["diag-lang/std", "intern-lang/std"]
 
 
 # DEPENDENCIES
 # #################################
 [dependencies]
-serde = { version = "1", optional = true, default-features = false, features = ["derive", "alloc"] }
+# Interned name handles (`Symbol`) used as the keys of every scope.
+intern-lang = { version = "1", default-features = false }
+# Diagnostics for the name errors (unresolved, duplicate); re-exports `Span`.
+diag-lang = { version = "1", default-features = false }
 
 
 # DEV DEPENDENCIES

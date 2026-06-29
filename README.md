@@ -26,7 +26,7 @@
         <strong>MSRV is 1.85+</strong> (Rust 2024 edition).
     </p>
     <blockquote>
-        <strong>Status: pre-1.0, in active development.</strong> The public API is being designed across the 0.x series and frozen at <code>1.0.0</code>. See <a href="./CHANGELOG.md"><code>CHANGELOG.md</code></a>.
+        <strong>Status: stable.</strong> The public API is frozen as of <code>1.0.0</code> and follows Semantic Versioning &mdash; no breaking changes before <code>2.0</code>. See <a href="./CHANGELOG.md"><code>CHANGELOG.md</code></a>.
     </blockquote>
 </div>
 
@@ -37,14 +37,44 @@
 
 ```toml
 [dependencies]
-symbol-lang = "0.1"
+symbol-lang = "1"
+```
+
+<br>
+
+## Example
+
+A lexically-scoped symbol table generic over the binding. A name resolves to the nearest enclosing definition; inner scopes shadow.
+
+```rust
+use symbol_lang::{unresolved_name, SymbolTable};
+use intern_lang::Interner;
+use diag_lang::Span;
+
+let mut names = Interner::new();
+let x = names.intern("x");
+let y = names.intern("y");
+
+let mut table: SymbolTable<i32> = SymbolTable::new();
+table.define(x, 1);
+
+table.enter_scope();
+table.define(x, 2);                       // shadows the outer `x`
+assert_eq!(table.lookup(x), Some(&2));
+table.exit_scope();
+assert_eq!(table.lookup(x), Some(&1));     // outer `x` visible again
+
+// An unresolved reference becomes a diagnostic.
+assert!(table.lookup(y).is_none());
+let diag = unresolved_name("y", Span::new(10, 11));
+assert_eq!(diag.message(), "cannot find `y` in this scope");
 ```
 
 <br>
 
 ## Status
 
-This is the <code>v0.1.0</code> scaffold: structure, tooling, and quality gates are in place; the implementation lands across the 0.x series per the <a href="./dev/ROADMAP.md"><code>ROADMAP</code></a> and <a href="./docs/API.md"><code>docs/API.md</code></a>.
+This is <code>v1.0.0</code>: the public API is stable and frozen under SemVer. The lexically-scoped <code>SymbolTable</code> and the name-error diagnostics are complete and catalogued in <a href="./docs/API.md"><code>docs/API.md</code></a>.
 
 <hr>
 <br>
