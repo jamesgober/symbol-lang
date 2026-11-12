@@ -21,6 +21,23 @@
 
 ---
 
+## [1.0.1] - 2026-11-12
+
+A patch release. The public API and its behaviour are unchanged.
+
+### Fixed
+
+- **`lookup` no longer slows down with nesting depth.** It searched each open
+  scope from the innermost out, so a name defined in an outer scope and used at
+  every level of a deep nest cost `O(depth)` per lookup and `O(depth^2)` in
+  total. The table now keeps one stack of bindings per name, innermost on top,
+  and each scope records the names it defined so `exit_scope` pops exactly
+  those. `lookup` and `lookup_local` are one map search whatever the depth.
+  Looking an outer name up at each of 16,000 nested levels went from about
+  1.6 s to a few milliseconds in a debug build.
+
+---
+
 ## [1.0.0] - 2026-06-28
 
 API freeze. The symbol-table and diagnostics surface is stable and will not change
@@ -64,7 +81,8 @@ Initial scaffold and repository bootstrap. No domain logic yet &mdash; this rele
 - `.github/workflows/ci.yml` CI matrix; `deny.toml`, `clippy.toml`, `rustfmt.toml`.
 - `dev/DIRECTIVES.md` and `dev/ROADMAP.md` (committed engineering standards + plan).
 
-[Unreleased]: https://github.com/jamesgober/symbol-lang/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/jamesgober/symbol-lang/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/jamesgober/symbol-lang/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/jamesgober/symbol-lang/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/jamesgober/symbol-lang/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jamesgober/symbol-lang/releases/tag/v0.1.0

@@ -44,7 +44,8 @@ symbol-lang = "1"
 
 `SymbolTable<T>` is the scope chain — a stack of scopes, each a map from `Symbol`
 to a binding `T`. There is always a root scope, so it is usable immediately and the
-root can never be exited.
+root can never be exited. A `lookup` costs one map search over the names currently
+bound, however deeply the scopes are nested.
 
 ```rust
 use symbol_lang::SymbolTable;
