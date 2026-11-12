@@ -45,9 +45,14 @@ use intern_lang::Symbol;
 /// assert_eq!(table.lookup(x), Some(&1)); // outer `x` is visible again
 /// ```
 pub struct SymbolTable<T> {
-    /// The scope chain, outermost first. Never empty: `scopes[0]` is the root, and
-    /// [`exit_scope`](SymbolTable::exit_scope) refuses to pop it.
-    scopes: Vec<BTreeMap<Symbol, T>>,
+    /// Every live binding, keyed by name. Each name maps to a stack of
+    /// `(scope index, value)` pairs, innermost last, so the nearest binding is
+    /// always on top and a lookup costs one map search whatever the depth.
+    bindings: BTreeMap<Symbol, Vec<(usize, T)>>,
+    /// The names defined in each open scope, outermost first. Never empty:
+    /// `scopes[0]` is the root, and [`exit_scope`](SymbolTable::exit_scope)
+    /// refuses to pop it. Exiting a scope pops exactly these names' stacks.
+    scopes: Vec<Vec<Symbol>>,
 }
 
 impl<T> SymbolTable<T> {
@@ -64,15 +69,14 @@ impl<T> SymbolTable<T> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            scopes: alloc::vec![BTreeMap::new()],
+            bindings: BTreeMap::new(),
+            scopes: alloc::vec![Vec::new()],
         }
     }
 
-    /// A mutable reference to the current (innermost) scope. The chain is never
-    /// empty, so the last element is always present.
-    fn current_mut(&mut self) -> &mut BTreeMap<Symbol, T> {
-        let last = self.scopes.len() - 1; // `len >= 1` by the type invariant
-        &mut self.scopes[last]
+    /// Index of the current (innermost) scope. The chain is never empty.
+    fn current(&self) -> usize {
+        self.scopes.len() - 1 // `len >= 1` by the type invariant
     }
 
     /// Pushes a new, empty innermost scope.
@@ -87,7 +91,7 @@ impl<T> SymbolTable<T> {
     /// assert_eq!(table.depth(), 2);
     /// ```
     pub fn enter_scope(&mut self) {
-        self.scopes.push(BTreeMap::new());
+        self.scopes.push(Vec::new());
     }
 
     /// Pops the innermost scope, discarding its bindings, and returns `true`.
@@ -107,12 +111,23 @@ impl<T> SymbolTable<T> {
     /// assert_eq!(table.depth(), 1);
     /// ```
     pub fn exit_scope(&mut self) -> bool {
-        if self.scopes.len() > 1 {
-            let _ = self.scopes.pop();
-            true
-        } else {
-            false
+        if self.scopes.len() <= 1 {
+            return false;
         }
+        let Some(names) = self.scopes.pop() else {
+            return false;
+        };
+        for name in names {
+            if let Some(stack) = self.bindings.get_mut(&name) {
+                // The innermost binding of every name defined in this scope is the
+                // one this scope made, so popping the top removes exactly it.
+                let _ = stack.pop();
+                if stack.is_empty() {
+                    let _ = self.bindings.remove(&name);
+                }
+            }
+        }
+        true
     }
 
     /// Runs `f` inside a freshly entered scope, exiting it afterward, and returns
@@ -168,11 +183,23 @@ impl<T> SymbolTable<T> {
     /// assert_eq!(table.define(n, 2), Some(1)); // redefined: the old binding comes back
     /// ```
     pub fn define(&mut self, name: Symbol, value: T) -> Option<T> {
-        self.current_mut().insert(name, value)
+        let current = self.current();
+        let stack = self.bindings.entry(name).or_default();
+        if let Some((scope, existing)) = stack.last_mut() {
+            if *scope == current {
+                return Some(core::mem::replace(existing, value));
+            }
+        }
+        stack.push((current, value));
+        self.scopes[current].push(name);
+        None
     }
 
     /// Looks `name` up through the scope chain, returning the binding from the
     /// nearest scope that defines it, or `None` if no scope does.
+    ///
+    /// The cost is one map search over the names currently bound, whatever the
+    /// nesting depth.
     ///
     /// # Examples
     ///
@@ -189,7 +216,10 @@ impl<T> SymbolTable<T> {
     /// ```
     #[must_use]
     pub fn lookup(&self, name: Symbol) -> Option<&T> {
-        self.scopes.iter().rev().find_map(|scope| scope.get(&name))
+        self.bindings
+            .get(&name)
+            .and_then(|stack| stack.last())
+            .map(|(_, value)| value)
     }
 
     /// Looks `name` up in the current scope only, ignoring enclosing scopes.
@@ -213,7 +243,12 @@ impl<T> SymbolTable<T> {
     /// ```
     #[must_use]
     pub fn lookup_local(&self, name: Symbol) -> Option<&T> {
-        self.scopes.last().and_then(|scope| scope.get(&name))
+        let current = self.current();
+        self.bindings
+            .get(&name)
+            .and_then(|stack| stack.last())
+            .filter(|(scope, _)| *scope == current)
+            .map(|(_, value)| value)
     }
 
     /// Returns `true` if `name` is bound anywhere in the scope chain.
