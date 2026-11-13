@@ -18,7 +18,7 @@
 
 <div align="left">
     <p>
-        symbol-lang is the SEMA-tier crate: Symbol tables, scope chains, and name binding/resolution over the AST. Part of the -lang language-construction family; see _strategy/LANG_COLLECTION.md for the master plan.
+        symbol-lang is the SEMA-tier crate: Symbol tables, scope chains, and name binding/resolution over the AST. Part of the -lang language-construction family.
     </p>
     <br>
     <hr>
